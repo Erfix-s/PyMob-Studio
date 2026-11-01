@@ -1,0 +1,81 @@
+name: Build APK from ZIP
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract ZIP and rebuild project structure
+        run: |
+          ZIP=$(ls *.zip 2>/dev/null | head -n1)
+
+          if [ -z "$ZIP" ]; then
+            echo "::error::هیچ فایل ZIP در ریپازیتوری پیدا نشد — فایل ZIP پروژه را آپلود کنید."
+            exit 1
+          fi
+
+          echo "باز کردن $ZIP ..."
+          unzip -o "$ZIP" -d z
+
+          # ساخت پوشه‌های پروژه
+          mkdir -p app/src/main/java/com/hoosha/pydroid \
+                   app/src/main/python \
+                   app/src/main/res/layout \
+                   app/src/main/res/values \
+                   app/src/main/res/drawable \
+                   app/src/main/assets/editor \
+                   gradle/wrapper
+
+          # هر فایل را از زیپ به مسیر درستش منتقل کن
+          pick() { find z -maxdepth 2 -iname "$1" | head -n1; }
+          get()  { P=$(pick "$1"); if [ -n "$P" ]; then cp "$P" "$2"; echo "OK -> $2"; else echo "::error::missing $1"; fi; }
+
+          get "settings.gradle*"          settings.gradle
+          get "root-build.gradle*"        build.gradle
+          get "gradle.properties*"        gradle.properties
+          get "gradle-wrapper.properties*" gradle/wrapper/gradle-wrapper.properties
+          get "app-build.gradle*"         app/build.gradle
+          get "AndroidManifest*"          app/src/main/AndroidManifest.xml
+          get "MainActivity*"             app/src/main/java/com/hoosha/pydroid/MainActivity.kt
+          get "bootstrap*"                app/src/main/python/bootstrap.py
+          get "editor*"                   app/src/main/assets/editor/index.html
+          get "activity_main*"            app/src/main/res/layout/activity_main.xml
+          get "values*"                   app/src/main/res/values/values.xml
+          get "ic_launcher*"              app/src/main/res/drawable/ic_launcher.xml
+          get "bg_button_accent*"         app/src/main/res/drawable/bg_button_accent.xml
+          get "bg_button_ghost*"          app/src/main/res/drawable/bg_button_ghost.xml
+          get "bg_input*"                 app/src/main/res/drawable/bg_input.xml
+          get "bg_placeholder*"           app/src/main/res/drawable/bg_placeholder.xml
+          get "gitignore*"                .gitignore
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Python (Chaquopy needs it)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PyMobStudio-APK
+          path: app/build/outputs/apk/debug/*.apk

@@ -3,7 +3,8 @@ name: Build APK
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -27,6 +28,16 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Verify Python
+        run: |
+          python --version
+          python3.10 --version
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
@@ -38,15 +49,18 @@ jobs:
         with:
           name: PyStudio-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
 
-      - name: Publish to Releases
+      - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v2.1.${{ github.run_number }}
           name: PyStudio v2.1.${{ github.run_number }}
           body: |
             PyStudio Android Python IDE
-            Automatic APK build
+
+            Automatic APK Build
+            Version: 2.1.${{ github.run_number }}
           files: app/build/outputs/apk/debug/app-debug.apk
           make_latest: true
         env:
